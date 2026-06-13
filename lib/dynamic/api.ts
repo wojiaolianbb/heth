@@ -1,8 +1,22 @@
 import { createFileDataStore } from "./store.ts";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+export function resolveDynamicDataFile() {
+  if (process.env.HEALTH_DATA_FILE) {
+    return process.env.HEALTH_DATA_FILE;
+  }
+
+  if (process.env.VERCEL) {
+    return join(tmpdir(), "heth", "health-store.json");
+  }
+
+  return undefined;
+}
 
 export function getDynamicStore() {
   return createFileDataStore({
-    filePath: process.env.HEALTH_DATA_FILE
+    filePath: resolveDynamicDataFile()
   });
 }
 
