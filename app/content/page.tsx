@@ -1,40 +1,43 @@
 import Link from "next/link";
-import { healthTopics } from "../../data/content";
+import { Disclaimer } from "../../components/Disclaimer";
+import { getDynamicStore } from "../../lib/dynamic/api";
 
-const disclaimer =
-  "本网站内容仅供一般健康信息参考，不构成医疗建议、诊断或治疗方案。如有健康问题，请咨询专业医生。";
+export const dynamic = "force-dynamic";
 
 export default function ContentListPage() {
+  const topics = getDynamicStore().listTopics();
+
   return (
-    <section className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-emerald-700">养生内容</p>
-        <h1 className="mt-2 text-3xl font-bold text-emerald-950 sm:text-4xl">基础主题</h1>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-slate-700">
-          选择一个主题，浏览对应的基础养生信息。
+    <section className="space-y-8">
+      <div className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
+        <h1 className="text-3xl font-bold text-emerald-950 sm:text-4xl">
+          动态主题体系
+        </h1>
+        <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
+          主题内容来自服务端动态数据层。你可以把它扩展成睡眠、训练、饮食、恢复、工作节奏等个人身体建设模块。
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {healthTopics.map((topic) => (
-          <Link
-            className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-emerald-900/10 transition hover:-translate-y-0.5 hover:shadow-md"
-            href={`/content/${topic.slug}`}
-            key={topic.id}
-          >
-            <h2 className="text-xl font-semibold text-emerald-950">{topic.title}</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-700">{topic.summary}</p>
-          </Link>
-        ))}
-      </div>
+      {topics.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {topics.map((topic) => (
+            <Link
+              className="rounded-lg bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              href={`/content/${topic.slug}`}
+              key={topic.id}
+            >
+              <h2 className="text-xl font-bold text-emerald-950">{topic.title}</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-700">{topic.summary}</p>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg bg-white p-6 text-slate-700 shadow-sm ring-1 ring-slate-200">
+          暂无主题。请通过动态数据导入或管理接口添加主题。
+        </div>
+      )}
 
-      <aside
-        aria-label="健康免责声明"
-        className="rounded-lg border-2 border-amber-500 bg-amber-50 p-4"
-      >
-        <h2 className="text-lg font-bold text-amber-950">健康免责声明</h2>
-        <p className="mt-2 text-sm font-medium leading-6 text-amber-950">{disclaimer}</p>
-      </aside>
+      <Disclaimer compact />
     </section>
   );
 }
