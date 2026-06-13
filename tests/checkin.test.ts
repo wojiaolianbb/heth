@@ -1,99 +1,56 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import {
-  buildCheckinKey,
-  createInitialCheckinState,
-  habits,
-  readCheckinState,
-  saveCheckinState,
-  parseCheckinState,
-  serializeCheckinState,
-  type CheckinState
-} from "../lib/checkin.ts";
+import { createFileDataStore } from "../lib/dynamic/store.ts";
 
-test("buildCheckinKey formats a local date as checkin-YYYY-MM-DD", () => {
-  const date = new Date(2026, 4, 13, 9, 30, 0);
-
-  assert.equal(buildCheckinKey(date), "checkin-2026-05-13");
-});
-
-test("createInitialCheckinState marks every fixed habit as incomplete", () => {
-  const state = createInitialCheckinState();
-
-  assert.deepEqual(
-    state,
-    Object.fromEntries(habits.map((habit) => [habit.id, false]))
-  );
-});
-
-test("serializeCheckinState only stores habit completion booleans", () => {
-  const state: CheckinState = {
-    "drink-water": true,
-    "sleep-phone-away": false
-  };
-
-  assert.deepEqual(JSON.parse(serializeCheckinState(state)), {
-    "drink-water": true,
-    "sleep-phone-away": false,
-    "walk-outside": false,
-    "breakfast-on-time": false,
-    stretch: false
+function createTestStore() {
+  return createFileDataStore({
+    filePath: join(mkdtempSync(join(tmpdir(), "heth-checkin-")), "store.json")
   });
-});
+}
 
-test("parseCheckinState keeps stored booleans and ignores unrelated values", () => {
-  const state = parseCheckinState(
-    JSON.stringify({
-      "drink-water": true,
-      "sleep-phone-away": "yes",
-      note: "private text"
-    })
-  );
-
-  assert.deepEqual(state, {
-    "drink-water": true,
-    "sleep-phone-away": false,
-    "walk-outside": false,
-    "breakfast-on-time": false,
-    stretch: false
-  });
-});
-
-test("parseCheckinState falls back to default state for invalid JSON", () => {
-  assert.deepEqual(parseCheckinState("{"), createInitialCheckinState());
-});
-
-test("readCheckinState and saveCheckinState use only the requested date key", () => {
-  const storedValues = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => storedValues.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      storedValues.set(key, value);
-    }
-  };
-  const key = "checkin-2026-05-13";
-
-  saveCheckinState(storage, key, {
-    "drink-water": true,
-    "sleep-phone-away": false,
-    "walk-outside": true,
-    "breakfast-on-time": false,
-    stretch: false
+test("dynamic check-in state is derived from active habits", () => {
+  const store = createTestStore();
+  store.upsertHabit({
+    id: "custom-warmup",
+    label: "训练前做一次轻量准备",
+    active: true
   });
 
-  assert.deepEqual(JSON.parse(storedValues.get(key) ?? ""), {
-    "drink-water": true,
-    "sleep-phone-away": false,
-    "walk-outside": true,
-    "breakfast-on-time": false,
-    stretch: false
+  const state = store.getCheckin("checkin-2026-06-07");
+
+  assert.equal(Object.keys(state).includes("custom-warmup"), true);
+  assert.equal(Object.values(state).every((value) => value === false), true);
+});
+
+test("dynamic check-ins ignore unknown fields and keep boolean-only records", () => {
+  const store = createTestStore();
+  const habits = store.listHabits();
+
+  const saved = store.saveCheckin("checkin-2026-06-07", {
+    [habits[0].id]: true,
+    unknown: true,
+    note: "private text"
   });
-  assert.deepEqual(readCheckinState(storage, key), {
-    "drink-water": true,
-    "sleep-phone-away": false,
-    "walk-outside": true,
-    "breakfast-on-time": false,
-    stretch: false
-  });
-  assert.equal(storedValues.has("health-data"), false);
+
+  assert.equal(Object.keys(saved).includes("unknown"), false);
+  assert.equal(Object.keys(saved).includes("note"), false);
+  assert.equal(Object.values(saved).every((value) => typeof value === "boolean"), true);
+});
+
+test("dynamic check-in history summarizes 7-day and 30-day windows", () => {
+  const store = createTestStore();
+  const state = Object.fromEntries(store.listHabits().map((habit) => [habit.id, true]));
+
+  store.saveCheckin("checkin-2026-06-07", state);
+
+  const sevenDay = store.getCheckinHistory(new Date(2026, 5, 7), 7);
+  const thirtyDay = store.getCheckinHistory(new Date(2026, 5, 7), 30);
+
+  assert.equal(sevenDay.days.length, 7);
+  assert.equal(thirtyDay.days.length, 30);
+  assert.equal(sevenDay.currentStreak, 1);
+  assert.equal(thirtyDay.days.at(-1)?.dateKey, "checkin-2026-06-07");
 });

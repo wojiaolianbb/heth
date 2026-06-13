@@ -1,5 +1,9 @@
 node_modules/
 .next/
+.next-stale-*/
 .env
 .env.local
 tsconfig.tsbuildinfo
+.data/
+.worktrees/
+.vercel

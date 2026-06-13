@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.data/
+.worktrees/
+.env.local
+tsconfig.tsbuildinfo
+*.test.ts
+tests/
+docs/
+*.png
+AGENTS.md
+技术设计方案.md
+功能清单.md
